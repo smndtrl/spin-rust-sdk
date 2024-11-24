@@ -13,6 +13,8 @@ pub use spin_executor::run;
 use std::cell::RefCell;
 use std::future::Future;
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
+
 use std::task::Poll;
 
 const READ_SIZE: u64 = 16 * 1024;
@@ -30,7 +32,8 @@ pub(crate) fn outgoing_body(body: OutgoingBody) -> impl Sink<Vec<u8>, Error = St
     }
 
     let stream = body.write().expect("response body should be writable");
-    let pair = Rc::new(RefCell::new(Outgoing(Some((stream, body)))));
+    // let pair = Rc::new(RefCell::new(Outgoing(Some((stream, body)))));
+    let pair = Arc::new(Mutex::new(Outgoing(Some((stream, body)))));
 
     sink::unfold((), {
         move |(), chunk: Vec<u8>| {
@@ -40,7 +43,8 @@ pub(crate) fn outgoing_body(body: OutgoingBody) -> impl Sink<Vec<u8>, Error = St
                 let pair = pair.clone();
 
                 move |context| {
-                    let pair = pair.borrow();
+                    // let pair = pair.borrow();
+                    let pair = pair.lock().unwrap();
                     let (stream, _) = &pair.0.as_ref().unwrap();
                     loop {
                         match stream.check_write() {
